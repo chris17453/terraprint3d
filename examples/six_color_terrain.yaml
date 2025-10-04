@@ -1,0 +1,22 @@
+# Maximum 6-color terrain example
+location:
+  bounds:
+    north: 47.6300
+    south: 47.5900   
+    east: -122.3000  
+    west: -122.3600  
+
+output:
+  filename: "seattle_6color.stl"
+  printer_bed_mm: 220
+  
+terrain:
+  resolution_meters: 120  # Lower resolution for faster processing
+  vertical_exaggeration: 4.0  # High exaggeration to show elevation differences
+  base_thickness_mm: 3.0
+  
+  colors:
+    enabled: true
+    num_colors: 6  # Maximum colors for multi-material printers
+    color_mode: "elevation"
+    color_names: ["blue", "cyan", "green", "yellow", "orange", "red"]

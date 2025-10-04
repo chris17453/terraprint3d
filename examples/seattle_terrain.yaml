@@ -1,0 +1,17 @@
+# Seattle terrain configuration
+# Downtown Seattle with surrounding hills
+location:
+  bounds:
+    north: 47.6500   # North Seattle
+    south: 47.5800   # South Seattle  
+    east: -122.2800  # East Seattle
+    west: -122.3800  # West Seattle
+
+output:
+  filename: "seattle_terrain.stl"
+  printer_bed_mm: 220
+  
+terrain:
+  resolution_meters: 50  # 50m resolution
+  vertical_exaggeration: 3.0  # Emphasize Seattle's hills
+  base_thickness_mm: 5.0

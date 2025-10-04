@@ -1,0 +1,25 @@
+# Height stepped terrain (single color with terraced levels)
+location:
+  bounds:
+    north: 47.6200
+    south: 47.6000   
+    east: -122.3200  
+    west: -122.3400  
+
+output:
+  filename: "seattle_stepped.stl"
+  printer_bed_mm: 220
+  
+terrain:
+  resolution_meters: 80
+  vertical_exaggeration: 2.5
+  base_thickness_mm: 5.0
+  
+  # Only height stepping, no colors
+  height_stepping:
+    enabled: true
+    step_height_mm: 2.5  # 2.5mm steps for smooth terracing
+    smooth_transitions: true  # Gradual step transitions
+  
+  colors:
+    enabled: false  # Single color output

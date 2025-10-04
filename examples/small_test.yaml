@@ -1,0 +1,16 @@
+# Small test configuration for faster processing
+location:
+  bounds:
+    north: 47.6200   # Small area in Seattle
+    south: 47.6000   
+    east: -122.3200  
+    west: -122.3400  
+
+output:
+  filename: "small_test.stl"
+  printer_bed_mm: 220
+  
+terrain:
+  resolution_meters: 100  # Lower resolution for faster testing
+  vertical_exaggeration: 2.0
+  base_thickness_mm: 3.0

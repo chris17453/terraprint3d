@@ -1,0 +1,14 @@
+# Example configuration using address geocoding
+# Requires Google Maps API key
+location:
+  address: "1600 Amphitheatre Parkway, Mountain View, CA"
+  radius_km: 2.0
+
+output:
+  filename: "mountain_view_terrain.stl"
+  printer_bed_mm: 220  # Standard Ender 3 size
+  
+terrain:
+  resolution_meters: 50  # 50m resolution for faster processing
+  vertical_exaggeration: 2.0
+  base_thickness_mm: 5.0

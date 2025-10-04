@@ -1,0 +1,23 @@
+# 3MF format with embedded colors - perfect for Bambu Lab!
+location:
+  bounds:
+    north: 47.6200
+    south: 47.6000   
+    east: -122.3200  
+    west: -122.3400  
+
+output:
+  filename: "seattle_colored.3mf"  # 3MF format
+  format: "3mf"
+  printer_bed_mm: 220
+  
+terrain:
+  resolution_meters: 100
+  vertical_exaggeration: 3.0
+  base_thickness_mm: 4.0
+  
+  colors:
+    enabled: true
+    num_colors: 4
+    color_mode: "elevation"
+    color_names: ["blue", "green", "yellow", "red"]

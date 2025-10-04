@@ -1,0 +1,17 @@
+# Example configuration using coordinate bounds
+# Works without API key using free elevation data
+location:
+  bounds:
+    north: 37.4419   # San Francisco Bay Area
+    south: 37.4219
+    east: -122.0840
+    west: -122.1040
+
+output:
+  filename: "bay_area_terrain.stl"
+  printer_bed_mm: 220
+  
+terrain:
+  resolution_meters: 50  # 50m resolution for testing
+  vertical_exaggeration: 3.0  # More dramatic for mountainous terrain
+  base_thickness_mm: 5.0

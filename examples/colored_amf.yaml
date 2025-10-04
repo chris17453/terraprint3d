@@ -1,0 +1,23 @@
+# AMF format with embedded colors and materials
+location:
+  bounds:
+    north: 47.6200
+    south: 47.6000   
+    east: -122.3200  
+    west: -122.3400  
+
+output:
+  filename: "seattle_terrain.amf"  # AMF format
+  format: "amf"
+  printer_bed_mm: 220
+  
+terrain:
+  resolution_meters: 120
+  vertical_exaggeration: 2.5
+  base_thickness_mm: 3.0
+  
+  colors:
+    enabled: true
+    num_colors: 6
+    color_mode: "elevation"
+    color_names: ["navy", "blue", "cyan", "green", "yellow", "red"]

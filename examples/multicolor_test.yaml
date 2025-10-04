@@ -1,0 +1,30 @@
+# Multi-color test without geocoding  
+location:
+  bounds:
+    north: 47.6200
+    south: 47.6000   
+    east: -122.3200  
+    west: -122.3400  
+
+output:
+  filename: "multicolor_test.stl"
+  printer_bed_mm: 220
+  
+terrain:
+  resolution_meters: 100
+  vertical_exaggeration: 3.0
+  base_thickness_mm: 4.0
+  
+  # Height stepping configuration
+  height_stepping:
+    enabled: true
+    step_height_mm: 3.0  # 3mm steps
+    smooth_transitions: false  # Sharp, distinct levels
+  
+  # Multi-color configuration  
+  colors:
+    enabled: true
+    num_colors: 4  # 4 color zones for elevation
+    color_mode: "elevation"  # Color by elevation
+    color_names: ["blue", "green", "yellow", "red"]  # Water, lowland, midland, highland
+    layer_thickness_mm: 3.0  # Thickness of color layers in mm
