@@ -283,16 +283,84 @@ class MultiColorMeshGenerator(MeshGenerator):
             # Base zone covers everything 
             color_mask[:, :] = True
         else:
-            # For color zones, only include points that belong to this zone
+            # For color zones, include points that belong to this zone
+            # PLUS boundary points from the next layer up to fill gaps
             for i in range(z_grid.shape[0]):
                 for j in range(z_grid.shape[1]):
                     elevation = z_grid[i, j]
                     if not np.isnan(elevation):
                         point_zone = self._assign_elevation_to_zone(elevation, all_zones)
+                        
+                        # Include points that belong to this zone
                         if point_zone == target_zone_idx:
+                            color_mask[i, j] = True
+                        # Also include boundary points from higher layers that need to connect
+                        # BUT only if this XY position isn't already covered by this layer or lower layers
+                        elif (point_zone > target_zone_idx and 
+                              self._is_boundary_intersection(i, j, z_grid, all_zones, target_zone_idx) and
+                              not self._is_xy_already_covered(i, j, z_grid, all_zones, target_zone_idx)):
                             color_mask[i, j] = True
         
         return color_mask
+    
+    def _is_boundary_intersection(self, i: int, j: int, z_grid: np.ndarray, 
+                                all_zones: List[Tuple[float, float]], target_zone_idx: int) -> bool:
+        """Check if a point from a higher layer should be included to fill boundary gaps."""
+        
+        # Check neighboring points to see if any belong to the current layer OR lower layers
+        # If so, this point from a higher layer should be included to connect
+        neighbors = []
+        for di in [-1, 0, 1]:
+            for dj in [-1, 0, 1]:
+                if di == 0 and dj == 0:
+                    continue  # Skip center point
+                ni, nj = i + di, j + dj
+                if 0 <= ni < z_grid.shape[0] and 0 <= nj < z_grid.shape[1]:
+                    neighbors.append((ni, nj))
+        
+        # Check if any neighbor belongs to the target zone or any lower zone
+        # This creates a "stacking" effect where higher layers connect down to fill gaps
+        for ni, nj in neighbors:
+            neighbor_elevation = z_grid[ni, nj]
+            if not np.isnan(neighbor_elevation):
+                neighbor_zone = self._assign_elevation_to_zone(neighbor_elevation, all_zones)
+                if neighbor_zone <= target_zone_idx:
+                    return True  # Include this boundary point to connect to lower layers
+        
+        return False
+    
+    def _is_xy_already_covered(self, i: int, j: int, z_grid: np.ndarray, 
+                             all_zones: List[Tuple[float, float]], target_zone_idx: int) -> bool:
+        """Check if this XY position is already covered by the current layer or lower layers."""
+        
+        # Check if any neighbor belongs to the current layer or lower layers
+        # If so, this XY position is already covered and we shouldn't add overlap
+        neighbors = []
+        for di in [-1, 0, 1]:
+            for dj in [-1, 0, 1]:
+                if di == 0 and dj == 0:
+                    continue  # Skip center point
+                ni, nj = i + di, j + dj
+                if 0 <= ni < z_grid.shape[0] and 0 <= nj < z_grid.shape[1]:
+                    neighbors.append((ni, nj))
+        
+        # Check if enough neighbors belong to current/lower layers to consider this covered
+        covered_neighbors = 0
+        total_neighbors = 0
+        
+        for ni, nj in neighbors:
+            neighbor_elevation = z_grid[ni, nj]
+            if not np.isnan(neighbor_elevation):
+                total_neighbors += 1
+                neighbor_zone = self._assign_elevation_to_zone(neighbor_elevation, all_zones)
+                if neighbor_zone <= target_zone_idx:
+                    covered_neighbors += 1
+        
+        # If most neighbors are already covered, consider this XY position covered
+        if total_neighbors > 0 and covered_neighbors >= total_neighbors * 0.6:  # 60% threshold
+            return True
+        
+        return False
     
     def _is_boundary_point(self, i: int, j: int, z_grid: np.ndarray, 
                           all_zones: List[Tuple[float, float]], target_zone_idx: int) -> bool:
@@ -409,13 +477,34 @@ class MultiColorMeshGenerator(MeshGenerator):
         vertex_indices_top = np.full((rows, cols), -1, dtype=int)
         vertex_indices_bottom = np.full((rows, cols), -1, dtype=int)
         
-        # Add vertices only for zones that belong to this layer
+        # Add vertices for zones that belong to this layer (including boundary intersections)
+        all_zones = self._calculate_color_zones(z_grid)
+        
+        # Find target zone index
+        target_zone_idx = None
+        for idx, (zone_min, zone_max) in enumerate(all_zones):
+            if abs(zone_min - target_zone_base) < 0.001:
+                target_zone_idx = idx
+                break
+        
         for i in range(rows):
             for j in range(cols):
                 if zone_mask[i, j] and not np.isnan(z_bottom_grid[i, j]):
                     x, y = x_grid[i, j], y_grid[i, j]
-                    z_top = z_top_grid[i, j]
-                    z_bottom = z_bottom_grid[i, j]
+                    
+                    # Check if this point belongs to the current zone or is a boundary intersection
+                    elevation = z_grid[i, j] if z_grid is not None else z_bottom_grid[i, j]
+                    point_zone = self._assign_elevation_to_zone(elevation, all_zones)
+                    
+                    if point_zone == target_zone_idx:
+                        # Point belongs to this layer - use layer height
+                        z_top = z_top_grid[i, j]
+                        z_bottom = z_bottom_grid[i, j]
+                    else:
+                        # Boundary intersection point from next layer up - adjust height to current layer
+                        layer_thickness = self.config.terrain.colors.layer_thickness_mm
+                        z_bottom = elevation  # Use terrain elevation as bottom
+                        z_top = elevation + layer_thickness  # Add layer thickness
                     
                     # Add top and bottom vertices
                     vertex_indices_top[i, j] = len(vertices)

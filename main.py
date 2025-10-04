@@ -4,7 +4,7 @@ from terraprint3d.config.parser import Config
 from terraprint3d.geocoding.service import GeocodingService
 from terraprint3d.elevation.fetcher import ElevationFetcher
 from terraprint3d.mesh.generator import MeshGenerator
-from terraprint3d.mesh.multicolor import MultiColorMeshGenerator
+from terraprint3d.mesh.simple_multicolor import SimpleMultiColorMeshGenerator
 from terraprint3d.mesh.colored_export import ColoredMeshExporter
 from terraprint3d.cache import ElevationCache
 from terraprint3d.preview import PreviewGenerator
@@ -59,8 +59,8 @@ def main(config_file, google_api_key, verbose, no_cache, clear_cache, cache_info
             mesh_generator = MeshGenerator(config)
             use_colored_export = True
         elif config.terrain.colors.enabled or config.terrain.height_stepping.enabled:
-            # Use multi-color generator for separate STL files
-            mesh_generator = MultiColorMeshGenerator(config)
+            # Use simple multi-color generator for separate STL files
+            mesh_generator = SimpleMultiColorMeshGenerator(config)
             use_colored_export = False
         else:
             # Standard single mesh
@@ -129,7 +129,7 @@ def main(config_file, google_api_key, verbose, no_cache, clear_cache, cache_info
                 if color_ref:
                     click.echo(f"✓ Color reference saved to {color_ref}")
         
-        elif isinstance(mesh_generator, MultiColorMeshGenerator):
+        elif isinstance(mesh_generator, SimpleMultiColorMeshGenerator):
             # Multi-color generation (separate STL files)
             meshes = mesh_generator.generate_multi_color_meshes(lat_grid, lon_grid, elevation_grid)
             
