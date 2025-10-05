@@ -47,15 +47,23 @@ class SimpleMultiColorMeshGenerator:
         num_colors = self.config.terrain.colors.num_colors
         zone_height = (max_z - min_z) / num_colors
         
+        print(f"\n🎨 DEBUG: Zone calculation")
+        print(f"   Terrain elevation range: {min_z:.1f}mm to {max_z:.1f}mm")
+        print(f"   Total elevation span: {max_z - min_z:.1f}mm")
+        print(f"   Number of color zones: {num_colors}")
+        print(f"   Zone height: {zone_height:.1f}mm each")
+        
         zones = []
         # Base zone (everything)
         zones.append((min_z, max_z))
+        print(f"   Zone 0 (base): {min_z:.1f} to {max_z:.1f}mm")
         
         # Color zones
         for i in range(num_colors):
             zone_min = min_z + i * zone_height
             zone_max = min_z + (i + 1) * zone_height
             zones.append((zone_min, zone_max))
+            print(f"   Zone {i+1}: {zone_min:.1f} to {zone_max:.1f}mm")
         
         return zones
     
@@ -80,6 +88,10 @@ class SimpleMultiColorMeshGenerator:
                           z_grid: np.ndarray, zones: List[Tuple[float, float]], target_zone: int) -> bool:
         """Check if a point is adjacent to any point in the target zone."""
         rows, cols = x_grid.shape
+        current_height = z_grid[i, j]
+        current_zone = self._assign_elevation_to_zone(current_height, zones)
+        
+        target_neighbors = []
         
         # Check all 8 neighbors (including diagonals)
         for di in [-1, 0, 1]:
@@ -93,9 +105,22 @@ class SimpleMultiColorMeshGenerator:
                     neighbor_zone = self._assign_elevation_to_zone(neighbor_height, zones)
                     
                     if neighbor_zone == target_zone:
-                        return True
+                        target_neighbors.append({
+                            'pos': (ni, nj),
+                            'height': neighbor_height,
+                            'zone': neighbor_zone
+                        })
         
-        return False
+        is_boundary = len(target_neighbors) > 0
+        
+        # Debug boundary detection for problematic cases
+        if is_boundary and (current_zone - target_zone) > 1:
+            print(f"       🔍 BOUNDARY: Point ({i},{j}) zone_{current_zone} adjacent to zone_{target_zone}")
+            print(f"          Current height: {current_height:.1f}")
+            print(f"          Zone gap: {current_zone - target_zone} zones")
+            print(f"          Adjacent target neighbors: {len(target_neighbors)}")
+        
+        return is_boundary
     
     def _create_height_map_grid(self, x_grid: np.ndarray, y_grid: np.ndarray, z_grid: np.ndarray) -> Dict:
         """Generate height map grid (X, Y, Z)."""
@@ -466,12 +491,22 @@ class SimpleMultiColorMeshGenerator:
                            zones: List[Tuple[float, float]], zone_idx: int) -> trimesh.Trimesh:
         """Create a color layer for the specified zone."""
         
+        print(f"\n🔧 DEBUG: Creating layer {zone_idx}")
+        print(f"   Zone bounds: {zones[zone_idx] if zone_idx < len(zones) else 'N/A'}")
+        
         rows, cols = x_grid.shape
         vertices = []
         faces = []
         vertex_indices = np.full((rows, cols), -1, dtype=int)
         
         layer_thickness = self.config.terrain.colors.layer_thickness_mm
+        print(f"   Layer thickness: {layer_thickness}mm")
+        
+        # Debug counters
+        own_zone_points = 0
+        boundary_points = 0
+        skipped_points = 0
+        border_conflicts = []
         
         # Loop through the grid and create vertices for this layer
         for i in range(rows):
@@ -482,12 +517,31 @@ class SimpleMultiColorMeshGenerator:
                     
                     # Include points that belong to this zone OR boundary points from higher zones
                     should_include = False
+                    inclusion_reason = ""
                     
                     if point_zone == zone_idx:
                         should_include = True
+                        inclusion_reason = "own_zone"
+                        own_zone_points += 1
                     elif point_zone > zone_idx:
                         # Check if this higher-zone point is adjacent to a point in our zone
-                        should_include = self._is_boundary_point(i, j, x_grid, y_grid, z_grid, zones, zone_idx)
+                        is_boundary = self._is_boundary_point(i, j, x_grid, y_grid, z_grid, zones, zone_idx)
+                        if is_boundary:
+                            should_include = True
+                            inclusion_reason = f"boundary_from_zone_{point_zone}"
+                            boundary_points += 1
+                            border_conflicts.append({
+                                'grid_pos': (i, j),
+                                'xy_pos': (x_grid[i, j], y_grid[i, j]),
+                                'height': terrain_height,
+                                'point_zone': point_zone,
+                                'current_layer': zone_idx,
+                                'reason': inclusion_reason
+                            })
+                        else:
+                            skipped_points += 1
+                    else:
+                        skipped_points += 1
                     
                     if should_include:
                         x, y = x_grid[i, j], y_grid[i, j]
@@ -499,12 +553,30 @@ class SimpleMultiColorMeshGenerator:
                         
                         # Bottom vertex (terrain surface)
                         vertices.append([x, y, terrain_height])
+                        
+                        # Debug high-conflict border points
+                        if inclusion_reason.startswith("boundary_from_zone_") and len(border_conflicts) <= 5:
+                            print(f"     🚨 Border conflict at ({i},{j}): point_zone={point_zone} included in layer_{zone_idx}")
+                            print(f"        XY=({x:.1f},{y:.1f}) Z={terrain_height:.1f} reason={inclusion_reason}")
+        
+        # Print debug summary
+        print(f"   📊 Layer {zone_idx} summary:")
+        print(f"      Own zone points: {own_zone_points}")
+        print(f"      Boundary points: {boundary_points} (potential conflicts)")
+        print(f"      Skipped points: {skipped_points}")
+        print(f"      Total vertices: {len(vertices)}")
+        print(f"      Border conflicts: {len(border_conflicts)}")
+        
+        if len(border_conflicts) > 5:
+            print(f"      ⚠️  {len(border_conflicts) - 5} more border conflicts not shown")
         
         if len(vertices) == 0:
+            print(f"   ❌ Layer {zone_idx} has no vertices - skipping")
             return None
         
         # Create faces for the surface and walls
-        vertices, faces = self._create_layer_faces(vertices, vertex_indices, rows, cols)
+        print(f"   🔨 Creating faces for layer {zone_idx}...")
+        vertices, faces = self._create_layer_faces(vertices, vertex_indices, rows, cols, zone_idx)
         
         # Create mesh
         mesh = trimesh.Trimesh(vertices=vertices, faces=faces)
@@ -512,11 +584,14 @@ class SimpleMultiColorMeshGenerator:
         
         return mesh
     
-    def _create_layer_faces(self, vertices: List, vertex_indices: np.ndarray, rows: int, cols: int) -> Tuple[np.ndarray, np.ndarray]:
+    def _create_layer_faces(self, vertices: List, vertex_indices: np.ndarray, rows: int, cols: int, zone_idx: int = -1) -> Tuple[np.ndarray, np.ndarray]:
         """Create faces for a layer mesh - only connect adjacent cells, no walls between disconnected pieces."""
         faces = []
+        face_conflicts = []
         
         # Create top surface faces
+        top_faces = 0
+        bottom_faces = 0
         for i in range(rows - 1):
             for j in range(cols - 1):
                 # Check if all 4 corners have vertices
@@ -534,6 +609,7 @@ class SimpleMultiColorMeshGenerator:
                         [v00_top, v01_top, v10_top],
                         [v01_top, v11_top, v10_top]
                     ])
+                    top_faces += 2
                     
                     # Bottom face vertices
                     v00_bottom = vertex_indices[i, j] + 1
@@ -546,8 +622,10 @@ class SimpleMultiColorMeshGenerator:
                         [v00_bottom, v10_bottom, v01_bottom],
                         [v01_bottom, v10_bottom, v11_bottom]
                     ])
+                    bottom_faces += 2
         
         # Create side walls ONLY between adjacent cells - no boundary connection
+        wall_faces = 0
         for i in range(rows):
             for j in range(cols):
                 if vertex_indices[i, j] >= 0:
@@ -564,6 +642,7 @@ class SimpleMultiColorMeshGenerator:
                             [curr_bottom, curr_top, next_bottom],
                             [curr_top, next_top, next_bottom]
                         ])
+                        wall_faces += 2
                     
                     # Check bottom neighbor
                     if i + 1 < rows and vertex_indices[i + 1, j] >= 0:
@@ -575,6 +654,9 @@ class SimpleMultiColorMeshGenerator:
                             [curr_bottom, next_top, curr_top],
                             [curr_bottom, next_bottom, next_top]
                         ])
+                        wall_faces += 2
+        
+        print(f"      Face creation summary: {top_faces} top + {bottom_faces} bottom + {wall_faces} wall = {len(faces)} total")
         
         return np.array(vertices), np.array(faces)
     
